@@ -46,7 +46,7 @@ docker compose down
 
 ### ⚙️ Environment Configuration
 
-Edit `.env` to change credentials, ports, or service options.
+Edit `.env` to change credentials, ports, or service options, including Kafka topic names.
 
 ```env
 POSTGRES_USER=timepush
@@ -55,11 +55,18 @@ POSTGRES_DB=timepush
 
 KAFKA_BROKER_ID=1
 KAFKA_LISTENER_PORT=9092
+KAFKA_TOPIC_DATA=timepush-data
+KAFKA_TOPIC_ERROR=timepush-error
+
 ZOOKEEPER_PORT=2181
 
 CLICKHOUSE_HTTP_PORT=8123
 CLICKHOUSE_TCP_PORT=9000
+
+
 ```
+
+On startup, the `kafka-init` service will automatically create the topics specified by `KAFKA_TOPIC_DATA` and `KAFKA_TOPIC_ERROR`.
 
 ---
 
