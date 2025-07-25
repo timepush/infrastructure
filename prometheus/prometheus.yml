@@ -1,0 +1,35 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # 1) Hono app metrics
+  - job_name: "ingest-api"
+    static_configs:
+      - targets: ["host.docker.internal:5000"] # replace 'app' with your service name
+    metrics_path: "/metrics"
+
+  # # 2) Postgres exporter
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # # 3) Redis exporter
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+
+  # # 4) Zookeeper exporter
+  # - job_name: 'zookeeper'
+  #   static_configs:
+  #     - targets: ['zookeeper-exporter:9141']
+
+  # # 5) Kafka exporter (via JMX)
+  # - job_name: 'kafka-jmx'
+  #   static_configs:
+  #     - targets: ['kafka-jmx-exporter:9308']
+
+  # # 6) ClickHouse exporter
+  # - job_name: 'clickhouse'
+  #   static_configs:
+  #     - targets: ['clickhouse-exporter:9116']

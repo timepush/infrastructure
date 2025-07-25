@@ -11,12 +11,15 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    command: ["postgres", "-c", "max_connections=300"]
 
   redis:
     image: redis:7
     restart: always
     ports:
       - "6379:6379"
+    volumes:
+      - redis-data:/data
 
   zookeeper:
     image: bitnami/zookeeper:latest
@@ -32,12 +35,13 @@ services:
     ports:
       - "${KAFKA_LISTENER_PORT}:${KAFKA_LISTENER_PORT}"
       - "${KAFKA_EXTERNAL_PORT}:${KAFKA_EXTERNAL_PORT}"
+      - "${KAFKA_LOCALHOST_PORT}:${KAFKA_LOCALHOST_PORT}"
     environment:
       KAFKA_BROKER_ID: ${KAFKA_BROKER_ID}
       KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:${ZOOKEEPER_PORT}
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:${KAFKA_LISTENER_PORT},EXTERNAL://:${KAFKA_EXTERNAL_PORT}
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:${KAFKA_LISTENER_PORT},EXTERNAL://localhost:${KAFKA_EXTERNAL_PORT}
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:19092,LOCALHOST://:29092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://host.docker.internal:19092,LOCALHOST://localhost:29092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT,LOCALHOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       ALLOW_PLAINTEXT_LISTENER: "yes"
     depends_on:
@@ -46,6 +50,14 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     restart: always
+    # entrypoint: ["/bin/sh", "/docker-entrypoint-initdb.d/clickhouse-init.sh"]
+    environment:
+      CLICKHOUSE_USER: "ch"
+      CLICKHOUSE_PASSWORD: "ch"        
+      CLICKHOUSE_KAFKA_BROKER: ${CLICKHOUSE_KAFKA_BROKER}
+      KAFKA_TOPIC_DATA: ${KAFKA_TOPIC_DATA}
+      KAFKA_TOPIC_ERROR: ${KAFKA_TOPIC_ERROR}
+      KAFKA_GROUP_NAME: ${KAFKA_GROUP_NAME}
     ports:
       - "${CLICKHOUSE_HTTP_PORT}:${CLICKHOUSE_HTTP_PORT}"
       - "${CLICKHOUSE_TCP_PORT}:${CLICKHOUSE_TCP_PORT}"
@@ -63,6 +75,30 @@ services:
         /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic ${KAFKA_TOPIC_DATA} --bootstrap-server kafka:${KAFKA_LISTENER_PORT} --partitions 1 --replication-factor 1
         /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic ${KAFKA_TOPIC_ERROR} --bootstrap-server kafka:${KAFKA_LISTENER_PORT} --partitions 1 --replication-factor 1
 
+  # Prometheus server
+  prometheus:
+    image: prom/prometheus:latest
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  # Grafana dashboard
+  grafana:
+    image: grafana/grafana:latest
+    restart: always
+    depends_on:
+      - prometheus
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+    volumes:
+      - grafana-data:/var/lib/grafana
 volumes:
+  redis-data:
   pgdata:
   clickhouse-data:
+  grafana-data:
+  prometheus-data:
