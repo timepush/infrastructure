@@ -6,7 +6,7 @@ scrape_configs:
   # 1) Hono app metrics
   - job_name: "ingest-api"
     static_configs:
-      - targets: ["host.docker.internal:5000"] # replace 'app' with your service name
+      - targets: ["nginx"] # replace 'app' with your service name
     metrics_path: "/metrics"
 
   # # 2) Postgres exporter

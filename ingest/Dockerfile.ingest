@@ -1,0 +1,19 @@
+
+# --- Build stage ---
+FROM oven/bun:1.2.19 AS builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y git 
+ARG INGEST_PORT=5000
+ENV INGEST_PORT=${INGEST_PORT}
+RUN git clone --depth 1 https://github.com/timepush/ingest.git .
+RUN bun install
+RUN bun build src/index.js --target bun --outdir dist --sourcemap
+
+# --- Production stage ---
+FROM oven/bun:1.2.19 AS prod
+WORKDIR /app
+RUN apt-get update && apt-get install -y netcat-openbsd 
+ARG INGEST_PORT=5000
+ENV INGEST_PORT=${INGEST_PORT}
+COPY --from=builder /app/dist ./dist 
+CMD ["bun", "run", "dist/index.js"]

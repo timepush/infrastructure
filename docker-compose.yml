@@ -55,8 +55,7 @@ services:
       CLICKHOUSE_USER: "ch"
       CLICKHOUSE_PASSWORD: "ch"        
       CLICKHOUSE_KAFKA_BROKER: ${CLICKHOUSE_KAFKA_BROKER}
-      KAFKA_TOPIC_DATA: ${KAFKA_TOPIC_DATA}
-      KAFKA_TOPIC_ERROR: ${KAFKA_TOPIC_ERROR}
+      KAFKA_TOPIC: ${KAFKA_TOPIC} 
       KAFKA_GROUP_NAME: ${KAFKA_GROUP_NAME}
     ports:
       - "${CLICKHOUSE_HTTP_PORT}:${CLICKHOUSE_HTTP_PORT}"
@@ -72,15 +71,15 @@ services:
     command:
       - |
         sleep 15
-        /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic ${KAFKA_TOPIC_DATA} --bootstrap-server kafka:${KAFKA_LISTENER_PORT} --partitions 1 --replication-factor 1
-        /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic ${KAFKA_TOPIC_ERROR} --bootstrap-server kafka:${KAFKA_LISTENER_PORT} --partitions 1 --replication-factor 1
+        /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists --topic ${KAFKA_TOPIC} --bootstrap-server ${KAFKA_BROKER} --partitions 1 --replication-factor 1
 
+  
   # Prometheus server
   prometheus:
     image: prom/prometheus:latest
     restart: always
     ports:
-      - "9090:9090"
+      - "${PROM_PORT}:${PROM_PORT}"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
 
@@ -91,11 +90,41 @@ services:
     depends_on:
       - prometheus
     ports:
-      - "3001:3000"
+      - "${GRAFANA_PORT}:${GRAFANA_PORT}"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: "admin"
     volumes:
       - grafana-data:/var/lib/grafana
+  
+  # Ingest service
+  ingest:
+    build:
+      context: .
+      dockerfile: ./ingest/Dockerfile.ingest 
+      args:
+        INGEST_PORT: ${INGEST_PORT}
+    env_file:
+      - .env
+    depends_on:
+      - kafka
+      - clickhouse
+      - postgres
+      - redis
+      - kafka-init
+    entrypoint: ["/bin/sh", "/app/wait-for-kafka.sh", "${KAFKA_BROKER}", "bun", "run", "dist/index.js"]
+    volumes:
+      - ./ingest/wait-for-kafka.sh:/app/wait-for-kafka.sh:ro
+  
+  nginx:
+    image: nginx:1.25
+    ports:
+      - "80:80"
+    environment:
+      - INGEST_PORT=${INGEST_PORT}
+    volumes:
+      - ./ingest/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - ingest
 volumes:
   redis-data:
   pgdata:
